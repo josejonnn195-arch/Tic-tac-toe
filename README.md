@@ -1,2 +1,259 @@
 # Tic-tac-toe
 Tic-tac-toe is a game where you play against a super-smart AI; try to win.
+<!DOCTYPE html><html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Jogo da Velha vs IA</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: radial-gradient(circle at top, #120458, #000);
+      color: #0ff;
+      overflow: hidden;
+    }
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(0,255,255,0.05) 0px,
+        rgba(0,255,255,0.05) 1px,
+        transparent 2px,
+        transparent 4px
+      );
+      pointer-events: none;
+    }
+    h1 {
+      margin-bottom: 10px;
+      font-size: 34px;
+      letter-spacing: 4px;
+      color: #0ff;
+      text-shadow: 0 0 10px #0ff, 0 0 20px #0ff;
+    }
+    #board {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 10px;
+      margin: 20px 0;
+      padding: 15px;
+      background: rgba(0,0,0,0.6);
+      border-radius: 16px;
+      box-shadow:
+        0 0 25px rgba(0,255,255,0.4),
+        inset 0 0 20px rgba(255,0,255,0.15);
+      animation: pulse 4s infinite alternate;
+    }
+    @keyframes pulse {
+      from { box-shadow: 0 0 15px rgba(0,255,255,0.3), inset 0 0 10px rgba(255,0,255,0.1); }
+      to   { box-shadow: 0 0 35px rgba(0,255,255,0.6), inset 0 0 25px rgba(255,0,255,0.2); }
+    }
+    .cell {
+      width: 100px;
+      height: 100px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 52px;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .cell:hover {
+      background: rgba(255,255,255,0.15);
+      transform: scale(1.05);
+      box-shadow: 0 0 15px rgba(0,198,255,0.6);
+    }
+    .cell.x {
+      color: #00c6ff;
+      text-shadow: 0 0 15px rgba(0,198,255,0.9);
+      animation: pop 0.25s ease;
+    }
+    .cell.o {
+      color: #ff005d;
+      text-shadow: 0 0 15px rgba(255,0,93,0.9);
+      animation: pop 0.25s ease;
+    }
+    @keyframes pop {
+      0% { transform: scale(0); }
+      100% { transform: scale(1); }
+    }
+    .cell:hover {
+      background: rgba(255,255,255,0.15);
+      transform: scale(1.05);
+    }
+    .win-line {
+      position: absolute;
+      height: 6px;
+      background: linear-gradient(90deg, #00c6ff, #0072ff);
+      border-radius: 6px;
+      animation: draw 0.4s ease forwards;
+    }
+    @keyframes draw {
+      from { width: 0; }
+      to { width: 320px; }
+    }
+    button {
+      padding: 12px 32px;
+      font-size: 16px;
+      font-weight: bold;
+      border: 2px solid #0ff;
+      border-radius: 30px;
+      background: transparent;
+      color: #0ff;
+      cursor: pointer;
+      text-shadow: 0 0 8px #0ff;
+      box-shadow: 0 0 15px rgba(0,255,255,0.6);
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: rgba(0,255,255,0.15);
+      box-shadow: 0 0 30px rgba(0,255,255,1);
+    }
+    #status {
+      margin-top: 12px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <audio id="clickSound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
+  <audio id="winSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+  <audio id="loseSound" src="https://actions.google.com/sounds/v1/cartoon/boing.ogg"></audio>
+  <h1>Jogo da Velha</h1>
+  <button onclick="startGame()">Começar</button>
+  <div id="board"></div>
+  <div id="status"></div>  <script>
+    const boardElement = document.getElementById('board');
+    const statusElement = document.getElementById('status');
+    const clickSound = document.getElementById('clickSound');
+    const winSound = document.getElementById('winSound');
+    const loseSound = document.getElementById('loseSound');
+    let board, gameOver;
+
+    const winPatterns = [
+      [0,1,2],[3,4,5],[6,7,8],
+      [0,3,6],[1,4,7],[2,5,8],
+      [0,4,8],[2,4,6]
+    ];
+
+    function startGame() {
+      board = Array(9).fill('');
+      gameOver = false;
+      boardElement.innerHTML = '';
+      statusElement.textContent = 'Sua vez (X)';
+
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.onclick = () => playerMove(i, cell);
+        boardElement.appendChild(cell);
+      }
+    }
+
+    function playerMove(index, cell) {
+      if (board[index] || gameOver) return;
+      clickSound.play();
+      board[index] = 'X';
+      cell.textContent = 'X';
+      cell.classList.add('x');
+
+      const win = getWinPattern('X');
+      if (win) {
+        statusElement.textContent = 'Você ganhou';
+        drawWinLine(win);
+        winSound.play();
+        gameOver = true;
+        return;
+      }
+
+      if (board.every(c => c)) {
+        statusElement.textContent = 'Empate';
+        gameOver = true;
+        return;
+      }
+
+      statusElement.textContent = 'IA pensando...';
+      setTimeout(aiMove, 300);
+    }
+
+    function aiMove() {
+      if (gameOver) return;
+      const bestMove = minimax(board, 'O').index;
+      board[bestMove] = 'O';
+      boardElement.children[bestMove].textContent = 'O';
+      boardElement.children[bestMove].classList.add('o');
+
+      const win = getWinPattern('O');
+      if (win) {
+        statusElement.textContent = 'A IA ganhou';
+        drawWinLine(win);
+        loseSound.play();
+        gameOver = true;
+        return;
+      }
+
+      if (board.every(c => c)) {
+        statusElement.textContent = 'Empate';
+        gameOver = true;
+        return;
+      }
+
+      statusElement.textContent = 'Sua vez (X)';
+    }
+
+    function getWinPattern(player) {
+      return winPatterns.find(p => p.every(i => board[i] === player));
+    }
+
+    function drawWinLine(pattern) {
+      const line = document.createElement('div');
+      line.className = 'win-line';
+
+      const positions = {
+        '0,1,2': 'top: 65px; left: 15px;',
+        '3,4,5': 'top: 180px; left: 15px;',
+        '6,7,8': 'top: 295px; left: 15px;',
+        '0,3,6': 'top: 15px; left: 65px; transform: rotate(90deg);',
+        '1,4,7': 'top: 15px; left: 180px; transform: rotate(90deg);',
+        '2,5,8': 'top: 15px; left: 295px; transform: rotate(90deg);',
+        '0,4,8': 'top: 15px; left: 15px; transform: rotate(45deg); width: 360px;',
+        '2,4,6': 'top: 15px; left: 15px; transform: rotate(-45deg); width: 360px;'
+      };
+
+      line.style = positions[pattern.join(',')];
+      boardElement.appendChild(line);
+    }
+
+    function minimax(newBoard, player) {
+      const avail = newBoard.map((v,i)=>v===''?i:null).filter(v=>v!==null);
+      if (checkWinner(newBoard,'X')) return {score:-10};
+      if (checkWinner(newBoard,'O')) return {score:10};
+      if (!avail.length) return {score:0};
+
+      const moves = [];
+      for (let i of avail) {
+        const move = {index:i};
+        newBoard[i] = player;
+        move.score = minimax(newBoard, player==='O'?'X':'O').score;
+        newBoard[i] = '';
+        moves.push(move);
+      }
+
+      return player==='O'
+        ? moves.reduce((a,b)=>b.score>a.score?b:a)
+        : moves.reduce((a,b)=>b.score<a.score?b:a);
+    }
+
+    function checkWinner(b,p){return winPatterns.some(w=>w.every(i=>b[i]===p));}
+  </script></body>
+</html>
